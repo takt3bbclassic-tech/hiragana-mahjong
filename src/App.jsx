@@ -89,6 +89,18 @@ function createGame({ mode, handSize, manualText }) {
   };
 }
 
+function isConfirmedBlock(block) {
+  return block.confirmed !== false;
+}
+
+function getConfirmedBlocks(fixedBlocks) {
+  return fixedBlocks.filter(isConfirmedBlock);
+}
+
+function getKanDrawCount(block) {
+  return Math.max(0, (block?.tiles?.length || 0) - 3);
+}
+
 function canMakeWord(word, tiles) {
   const remain = tiles.map((tile) => tile.char);
   for (const ch of word) {
@@ -122,13 +134,15 @@ function getWaits(tiles, dictionary) {
 }
 
 function getCompletionStatus(fixedBlocks) {
-  const lengths = fixedBlocks.map((block) => block.tiles.length);
+  const confirmedBlocks = getConfirmedBlocks(fixedBlocks);
+  const lengths = confirmedBlocks.map((block) => block.tiles.length);
   const pairCount = lengths.filter((len) => len === 2).length;
   const mentsuCount = lengths.filter((len) => len >= 3).length;
-  const lockedTileCount = fixedBlocks.reduce((sum, block) => sum + block.tiles.length, 0);
-  if (pairCount >= 7) return { complete: true, title: "七対子型の完成候補", detail: `2枚ブロックが${pairCount}個あります。`, pairCount, mentsuCount, lockedTileCount };
-  if (mentsuCount >= 4 && pairCount >= 1) return { complete: true, title: "4メンツ＋雀頭型の完成候補", detail: `メンツ${mentsuCount}個、雀頭${pairCount}個があります。`, pairCount, mentsuCount, lockedTileCount };
-  return { complete: false, title: "まだ完成ではありません", detail: `メンツ${mentsuCount}個、雀頭${pairCount}個です。`, pairCount, mentsuCount, lockedTileCount };
+  const tentativeCount = fixedBlocks.length - confirmedBlocks.length;
+  const lockedTileCount = confirmedBlocks.reduce((sum, block) => sum + block.tiles.length, 0);
+  if (pairCount >= 7) return { complete: true, title: "七対子型の完成候補", detail: `確定済みの2枚ブロックが${pairCount}個あります。`, pairCount, mentsuCount, lockedTileCount, tentativeCount };
+  if (mentsuCount >= 4 && pairCount >= 1) return { complete: true, title: "4メンツ＋雀頭型の完成候補", detail: `確定済みメンツ${mentsuCount}個、雀頭${pairCount}個があります。`, pairCount, mentsuCount, lockedTileCount, tentativeCount };
+  return { complete: false, title: "まだ完成ではありません", detail: `確定済みメンツ${mentsuCount}個、雀頭${pairCount}個です。`, pairCount, mentsuCount, lockedTileCount, tentativeCount };
 }
 
 function Tile({ tile, selected, onClick, disabled = false }) {
@@ -161,11 +175,12 @@ function CompletionCard({ status }) {
       <div className="flex flex-wrap items-center gap-2">
         <span className={`rounded-full px-3 py-1 text-xs font-bold ${status.complete ? "bg-amber-500 text-white" : "bg-stone-100"}`}>{status.complete ? "完成候補" : "未完成"}</span>
         <b>{status.title}</b>
+        {status.tentativeCount > 0 && <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-bold text-sky-800">仮固定 {status.tentativeCount}</span>}
       </div>
       <div className="mt-2 grid grid-cols-3 gap-2 text-center text-xs">
-        <div className="rounded-2xl bg-white/80 p-2"><b className="block text-base">{status.mentsuCount}</b>メンツ</div>
-        <div className="rounded-2xl bg-white/80 p-2"><b className="block text-base">{status.pairCount}</b>雀頭</div>
-        <div className="rounded-2xl bg-white/80 p-2"><b className="block text-base">{status.lockedTileCount}</b>固定牌</div>
+        <div className="rounded-2xl bg-white/80 p-2"><b className="block text-base">{status.mentsuCount}</b>確定メンツ</div>
+        <div className="rounded-2xl bg-white/80 p-2"><b className="block text-base">{status.pairCount}</b>確定雀頭</div>
+        <div className="rounded-2xl bg-white/80 p-2"><b className="block text-base">{status.lockedTileCount}</b>確定牌</div>
       </div>
       <p className="mt-2 text-xs opacity-80">{status.detail}</p>
     </div>
@@ -255,7 +270,7 @@ function HomeScreen({ onStart, savedGame, onLoadSaved, onClearSaved, userWords, 
         </div>
         <AdBox label="ホーム下部広告枠" />
       </div>
-      {modal === "help" && <Modal title="ソロ練習の遊び方" onClose={() => setModal(null)}><div className="space-y-2 text-sm text-stone-700"><p>手牌から文字を選び、「固定」で単語ブロックにします。</p><p>「1枚引く」で1枚だけ引き、不要な牌を選んで「捨てる」。1枚引いた後は、捨てるまで次の牌は引けません。</p><p>Lv1は待ち候補、Lv2は候補と形評価、Lv3はおすすめまで表示します。</p></div></Modal>}
+      {modal === "help" && <Modal title="ソロ練習の遊び方" onClose={() => setModal(null)}><div className="space-y-2 text-sm text-stone-700"><p>手牌から文字を選び、「仮固定」で候補ブロックにします。</p><p>仮固定を「確定」するとブロックが完成扱いになります。4枚以上のブロックは槓扱いになり、確定時に枚数-3枚を追加で自摸します。</p><p>「1枚引く」で1枚だけ引き、不要な牌を選んで「捨てる」。1枚引いた後は、捨てるまで次の牌は引けません。</p><p>Lv1は待ち候補、Lv2は候補と形評価、Lv3はおすすめまで表示します。</p></div></Modal>}
       {modal === "feedback" && <Modal title="要望/単語追加" onClose={() => setModal(null)}><div className="space-y-3"><input value={contactText} onChange={(e) => setContactText(e.target.value)} className="w-full rounded-2xl border p-3" placeholder="返信先メール（任意）" /><textarea value={requestText} onChange={(e) => setRequestText(e.target.value)} className="w-full rounded-2xl border p-3" rows={5} placeholder="追加したい単語や要望。例：かたつむり、しゃぼんだま / ゆきだるま" /><div className="rounded-2xl bg-emerald-50 p-3 text-xs text-emerald-900">検出中の3文字以上単語：{parsedRequestWords.length ? parsedRequestWords.join("、") : "なし"}</div><button type="button" onClick={submitRequestWords} className="w-full rounded-2xl bg-emerald-700 px-4 py-3 font-bold text-white sm:w-auto sm:py-2"><PlusCircle className="mr-2 inline" size={16} />単語を追加する</button><p className="text-xs text-stone-500">現時点では端末内保存です。送信機能をFirebase等につなぐ前でも、候補辞書には即時反映されます。</p></div></Modal>}
       {modal === "words-added" && <Modal title="単語を追加しました" onClose={() => setModal(null)}><p className="text-sm text-stone-700">追加した単語はこの端末に保存され、待ち候補・メンツ候補に反映されます。</p></Modal>}
     </div>
@@ -277,7 +292,18 @@ function SoloPlayScreen({ settings, onBack, dictionary }) {
   const finishText = [completionStatus.title, completionStatus.detail].join(String.fromCharCode(10));
   const drawOne = () => { if (hasDrawnThisTurn || wall.length === 0) return; setHand((prev) => [...prev, wall[0]]); setWall((prev) => prev.slice(1)); setHasDrawnThisTurn(true); };
   const discardSelected = () => { if (!hasDrawnThisTurn || selectedTiles.length !== 1) return; setDiscarded((prev) => [...prev, ...selectedTiles]); setHand((prev) => prev.filter((tile) => !selectedIds.includes(tile.id))); setSelectedIds([]); setHasDrawnThisTurn(false); };
-  const fixSelected = () => { if (!selectedTiles.length) return; setFixedBlocks((prev) => [...prev, { id: `block-${Date.now()}`, tiles: selectedTiles }]); setHand((prev) => prev.filter((tile) => !selectedIds.includes(tile.id))); setSelectedIds([]); };
+  const fixSelected = () => { if (!selectedTiles.length) return; setFixedBlocks((prev) => [...prev, { id: `block-${Date.now()}`, tiles: selectedTiles, confirmed: false }]); setHand((prev) => prev.filter((tile) => !selectedIds.includes(tile.id))); setSelectedIds([]); };
+  const confirmFixedBlock = (blockId) => {
+    const target = fixedBlocks.find((block) => block.id === blockId);
+    if (!target || isConfirmedBlock(target)) return;
+    const drawCount = Math.min(getKanDrawCount(target), wall.length);
+    const kanDraws = wall.slice(0, drawCount);
+    setFixedBlocks((prev) => prev.map((block) => block.id === blockId ? { ...block, confirmed: true, kanDrawCount: drawCount } : block));
+    if (drawCount > 0) {
+      setHand((prev) => [...prev, ...kanDraws]);
+      setWall((prev) => prev.slice(drawCount));
+    }
+  };
   const returnFixedBlock = (blockId) => { setFixedBlocks((prev) => { const target = prev.find((block) => block.id === blockId); if (!target) return prev; setHand((h) => [...h, ...target.tiles]); return prev.filter((block) => block.id !== blockId); }); };
   const undoLastBlock = () => { if (fixedBlocks.length) returnFixedBlock(fixedBlocks[fixedBlocks.length - 1].id); };
   const reset = () => { const next = createGame({ mode: "random", handSize: settings.handSize || 13 }); setHand(next.hand); setWall(next.wall); setFixedBlocks([]); setDiscarded([]); setSelectedIds([]); setHasDrawnThisTurn(false); };
@@ -295,11 +321,11 @@ function SoloPlayScreen({ settings, onBack, dictionary }) {
           </header>
           <section className="shrink-0 rounded-3xl bg-white p-3 shadow-sm sm:p-4"><h2 className="mb-2 font-bold">手牌</h2><div className="flex max-h-44 min-h-20 flex-wrap gap-2 overflow-y-auto rounded-3xl bg-emerald-900/5 p-2 pr-2 sm:max-h-32 sm:p-3">{hand.map((tile) => <Tile key={tile.id} tile={tile} selected={selectedIds.includes(tile.id)} onClick={() => setSelectedIds((prev) => prev.includes(tile.id) ? prev.filter((x) => x !== tile.id) : [...prev, tile.id])} />)}</div></section>
           <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-2 lg:overflow-hidden">
-            <section className="flex min-h-0 flex-col overflow-hidden rounded-3xl bg-white p-3 shadow-sm sm:p-4"><h2 className="mb-2 shrink-0 font-bold">固定ブロック</h2><div className="max-h-64 min-h-32 flex-1 space-y-2 overflow-y-auto pr-1 lg:max-h-none lg:min-h-0 lg:pr-2">{fixedBlocks.length ? fixedBlocks.map((block, i) => <div key={block.id} className="flex items-center gap-2 overflow-x-auto rounded-2xl bg-stone-50 p-2"><span className="rounded-full bg-stone-200 px-2 py-1 text-xs font-bold">{i + 1}</span><div className="flex gap-1">{block.tiles.map((tile) => <Tile key={tile.id} tile={tile} disabled />)}</div><button type="button" onClick={() => returnFixedBlock(block.id)} className="ml-auto shrink-0 rounded-xl border bg-white px-3 py-2 text-sm">戻す</button></div>) : <p className="text-sm text-stone-400">まだ固定なし</p>}</div></section>
+            <section className="flex min-h-0 flex-col overflow-hidden rounded-3xl bg-white p-3 shadow-sm sm:p-4"><h2 className="mb-2 shrink-0 font-bold">固定ブロック</h2><div className="max-h-64 min-h-32 flex-1 space-y-2 overflow-y-auto pr-1 lg:max-h-none lg:min-h-0 lg:pr-2">{fixedBlocks.length ? fixedBlocks.map((block, i) => { const drawCount = getKanDrawCount(block); const confirmed = isConfirmedBlock(block); return <div key={block.id} className={`flex items-center gap-2 overflow-x-auto rounded-2xl p-2 ${confirmed ? "bg-stone-50" : "bg-sky-50 ring-2 ring-sky-100"}`}><span className={`shrink-0 rounded-full px-2 py-1 text-xs font-bold ${confirmed ? "bg-stone-200" : "bg-sky-600 text-white"}`}>{confirmed ? i + 1 : "仮"}</span><div className="flex gap-1">{block.tiles.map((tile) => <Tile key={tile.id} tile={tile} disabled />)}</div>{!confirmed && <button type="button" onClick={() => confirmFixedBlock(block.id)} className="ml-auto shrink-0 rounded-xl bg-emerald-700 px-3 py-2 text-sm font-bold text-white">確定{drawCount > 0 ? `＋${drawCount}自摸` : ""}</button>}{confirmed && block.kanDrawCount > 0 && <span className="ml-auto shrink-0 rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">槓自摸 +{block.kanDrawCount}</span>}<button type="button" onClick={() => returnFixedBlock(block.id)} className={`${confirmed && block.kanDrawCount > 0 ? "" : confirmed ? "ml-auto" : ""} shrink-0 rounded-xl border bg-white px-3 py-2 text-sm`}>戻す</button></div>; }) : <p className="text-sm text-stone-400">まだ固定なし</p>}</div></section>
             <section className="flex min-h-0 flex-col overflow-hidden rounded-3xl bg-white p-3 shadow-sm sm:p-4"><h2 className="mb-2 shrink-0 font-bold">捨て牌</h2><div className="grid max-h-48 min-h-32 flex-1 grid-cols-5 content-start gap-2 overflow-y-auto rounded-2xl bg-stone-50 p-2 pr-1 sm:grid-cols-6 sm:p-3 lg:max-h-none lg:min-h-0 lg:pr-2">{discarded.map((tile) => <Tile key={tile.id} tile={tile} disabled />)}</div></section>
           </div>
           <CompletionCard status={completionStatus} />
-          <div className="grid shrink-0 grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-6"><button type="button" disabled={hasDrawnThisTurn || wall.length === 0} onClick={drawOne} className="rounded-2xl bg-emerald-700 px-3 py-3 font-bold text-white disabled:opacity-40 sm:py-2">1枚引く</button><button type="button" disabled={!selectedTiles.length} onClick={fixSelected} className="rounded-2xl border bg-white px-3 py-3 font-bold disabled:opacity-40 sm:py-2">固定</button><button type="button" disabled={!fixedBlocks.length} onClick={undoLastBlock} className="rounded-2xl border bg-white px-3 py-3 font-bold disabled:opacity-40 sm:py-2"><Undo2 className="mr-1 inline" size={16} />最後を戻す</button><button type="button" disabled={!hasDrawnThisTurn || selectedTiles.length !== 1} onClick={discardSelected} className="rounded-2xl bg-red-600 px-3 py-3 font-bold text-white disabled:opacity-40 sm:py-2"><Trash2 className="mr-1 inline" size={16} />捨てる</button><button type="button" onClick={() => alert(finishText)} className={`rounded-2xl px-3 py-3 font-bold sm:py-2 ${completionStatus.complete ? "bg-amber-500 text-white" : "bg-white border"}`}>完成判定</button><button type="button" onClick={reset} className="rounded-2xl border bg-white px-3 py-3 font-bold sm:py-2"><RotateCcw className="mr-1 inline" size={16} />リセット</button></div>
+          <div className="grid shrink-0 grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-6"><button type="button" disabled={hasDrawnThisTurn || wall.length === 0} onClick={drawOne} className="rounded-2xl bg-emerald-700 px-3 py-3 font-bold text-white disabled:opacity-40 sm:py-2">1枚引く</button><button type="button" disabled={!selectedTiles.length} onClick={fixSelected} className="rounded-2xl border bg-white px-3 py-3 font-bold disabled:opacity-40 sm:py-2">仮固定</button><button type="button" disabled={!fixedBlocks.length} onClick={undoLastBlock} className="rounded-2xl border bg-white px-3 py-3 font-bold disabled:opacity-40 sm:py-2"><Undo2 className="mr-1 inline" size={16} />最後を戻す</button><button type="button" disabled={!hasDrawnThisTurn || selectedTiles.length !== 1} onClick={discardSelected} className="rounded-2xl bg-red-600 px-3 py-3 font-bold text-white disabled:opacity-40 sm:py-2"><Trash2 className="mr-1 inline" size={16} />捨てる</button><button type="button" onClick={() => alert(finishText)} className={`rounded-2xl px-3 py-3 font-bold sm:py-2 ${completionStatus.complete ? "bg-amber-500 text-white" : "bg-white border"}`}>完成判定</button><button type="button" onClick={reset} className="rounded-2xl border bg-white px-3 py-3 font-bold sm:py-2"><RotateCcw className="mr-1 inline" size={16} />リセット</button></div>
           <AdBox label="プレイ画面下部広告枠" />
         </main>
         <div className="min-h-[360px] overflow-hidden lg:min-h-0"><AssistPanel level={assistLevel} hand={hand} fixedBlocks={fixedBlocks} selectedTiles={selectedTiles} dictionary={dictionary} /></div>
