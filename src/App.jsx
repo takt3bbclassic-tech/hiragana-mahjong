@@ -1,362 +1,73 @@
 import React, { useMemo, useState } from "react";
-import { Home, RotateCcw, Save, Shuffle, Sparkles, Trash2, Undo2, HelpCircle, MessageSquareText, PlusCircle } from "lucide-react";
+import { Home, RotateCcw, Save, Sparkles, Trash2, Undo2, HelpCircle, MessageSquareText, PlusCircle } from "lucide-react";
 
 const BASIC_TILES = "あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわん".split("");
 const EXTRA_TILES = "がぎぐげござじずぜぞだぢづでどばびぶべぼぱぴぷぺぽゃゅょっー".split("");
 const TILE_POOL = [...BASIC_TILES.flatMap((tile) => [tile, tile]), ...EXTRA_TILES];
+const TILE_PANEL_GROUPS = ["あいうえお", "かきくけこ", "さしすせそ", "たちつてと", "なにぬねの", "はひふへほ", "まみむめも", "やゆよ", "らりるれろ", "わん", "がぎぐげござじずぜぞ", "だぢづでどばびぶべぼ", "ぱぴぷぺぽゃゅょっー"].map((s) => s.split(""));
 const SAVE_KEY = "hiragana-mahjong-solo-save";
 const USER_WORDS_KEY = "hiragana-mahjong-user-words";
+const BASE_WORDS_TEXT = "あい あお あさ あし あめ いえ いぬ いも うえ うし うた うみ えき えび おに かお かぎ かさ かに かわ くさ くつ くま こめ さけ すし そら たこ つき とり ねこ はな ひと ふね ほし みこ みず むし もり やま ゆき ぱん ぺん ぞう ぶた あかり あくび あさひ あじさい あそび あたま あたり あぶら あまぐも あめふり あやとり いちご いなり いのち いろは うさぎ うどん うなぎ うらにわ えがお えほん おかし おかわり おさら おしろ おちゃ おにぎり おもちゃ おんがく かえる かがみ かぞく かばん かまくら からだ かるた かわら がっき がっこう きつね きのこ きもち きもの きらきら ぎゅうどん くじら くるま くるみ けしき けむり げんかん こおり こころ こたつ ことば こども こまどり さかな さくら さしみ さとう さよなら しおり しかく しずく しりとり しんぶん すいか すずめ すみれ せかい せっけん せんせい そよかぜ たいこ たから たぬき たまご だいこん ちから ちきゅう ちくわ ちゃわん ちょうちん つくえ つばめ つみき てがみ てぶくろ てんき とうふ ところてん とけい ともだち どんぐり ながれ なつやすみ なまえ にがおえ にわとり ぬいぐるみ ねずみ ねむり のりもの はさみ はなび はやし ひこうき ひまわり ふうせん ふとん へいわ べんとう ほたる ほのお まくら まつり まどべ まほう みかん みずうみ みどり みらい むぎちゃ むしめがね めがね めだか もみじ ものがたり やきそば やさい やまびこ ゆうぐれ ゆきだるま ゆびわ よあけ よこがお よみもの らくがき らっぱ りぼん りんご れいぞうこ れんが ろうそく わたあめ わらびもち うみねこ おおぞら おとしもの かきごおり かたつむり かみひこうき きんぎょ くつした こうえん こいのぼり さくらもち しゃぼんだま じゃぐち しろくま すなば たんぽぽ ちず つみきばこ てんとうむし なぞなぞ にじいろ はなむけ ひらがな ふでばこ ほしぞら まんげつ みずたまり めざまし やきいも ゆきぐに よせがき わすれもの ぎょうざ ぴかぴか ぽんこつ どらやき たいやき ちゃいろ きょうしつ しょうがっこう じてんしゃ じどうしゃ でんしゃ でんわ びょういん びじゅつ ぶらんこ ぷりん ぺんぎん ぽけっと";
+const BASE_WORDS = BASE_WORDS_TEXT.split(/\s+/).filter(Boolean);
+const BASE_WORD_SET = new Set(BASE_WORDS.map((word) => cleanText(word)));
 
-const BASE_WORDS = [
-  "あい", "あお", "あさ", "あし", "あめ", "いえ", "いぬ", "いも", "うえ", "うし", "うた", "うみ", "えき", "えび", "おに",
-  "かお", "かぎ", "かさ", "かに", "かわ", "くさ", "くつ", "くま", "こめ", "さけ", "すし", "そら", "たこ", "つき", "とり",
-  "ねこ", "はな", "ひと", "ふね", "ほし", "みこ", "みず", "むし", "もり", "やま", "ゆき", "ぱん", "ぺん", "ぞう", "ぶた",
-  "あかり", "あくび", "あさひ", "あじさい", "あそび", "あたま", "あたり", "あぶら", "あまぐも", "あめふり", "あやとり",
-  "いちご", "いなり", "いのち", "いろは", "うさぎ", "うどん", "うなぎ", "うらにわ", "えがお", "えほん", "おかし", "おかわり",
-  "おさら", "おしろ", "おちゃ", "おにぎり", "おもちゃ", "おんがく", "かえる", "かがみ", "かぞく", "かばん", "かまくら",
-  "からだ", "かるた", "かわら", "がっき", "がっこう", "きつね", "きのこ", "きもち", "きもの", "きらきら", "ぎゅうどん",
-  "くじら", "くるま", "くるみ", "けしき", "けむり", "げんかん", "こおり", "こころ", "こたつ", "ことば", "こども", "こまどり",
-  "さかな", "さくら", "さしみ", "さとう", "さよなら", "しおり", "しかく", "しずく", "しりとり", "しんぶん", "すいか", "すずめ",
-  "すみれ", "せかい", "せっけん", "せんせい", "そよかぜ", "たいこ", "たから", "たぬき", "たまご", "だいこん", "ちから",
-  "ちきゅう", "ちくわ", "ちゃわん", "ちょうちん", "つくえ", "つばめ", "つみき", "てがみ", "てぶくろ", "てんき", "とうふ",
-  "ところてん", "とけい", "ともだち", "どんぐり", "ながれ", "なつやすみ", "なまえ", "にがおえ", "にわとり", "ぬいぐるみ",
-  "ねずみ", "ねむり", "のりもの", "はさみ", "はなび", "はやし", "ひこうき", "ひまわり", "ふうせん", "ふとん", "へいわ",
-  "べんとう", "ほたる", "ほのお", "まくら", "まつり", "まどべ", "まほう", "みかん", "みずうみ", "みどり", "みらい",
-  "むぎちゃ", "むしめがね", "めがね", "めだか", "もみじ", "ものがたり", "やきそば", "やさい", "やまびこ", "ゆうぐれ",
-  "ゆきだるま", "ゆびわ", "よあけ", "よこがお", "よみもの", "らくがき", "らっぱ", "りぼん", "りんご", "れいぞうこ",
-  "れんが", "ろうそく", "わたあめ", "わらびもち", "うみねこ", "おおぞら", "おとしもの", "かきごおり", "かたつむり",
-  "かみひこうき", "きんぎょ", "くつした", "こうえん", "こいのぼり", "さくらもち", "しゃぼんだま", "じゃぐち", "しろくま",
-  "すなば", "たんぽぽ", "ちず", "つみきばこ", "てんとうむし", "なぞなぞ", "にじいろ", "はなむけ", "ひらがな", "ふでばこ",
-  "ほしぞら", "まんげつ", "みずたまり", "めざまし", "やきいも", "ゆきぐに", "よせがき", "わすれもの", "ぎょうざ",
-  "ぴかぴか", "ぽんこつ", "どらやき", "たいやき", "ちゃいろ", "きょうしつ", "しょうがっこう", "じてんしゃ", "じどうしゃ",
-  "でんしゃ", "でんわ", "びょういん", "びじゅつ", "ぶらんこ", "ぷりん", "ぺんぎん", "ぽけっと"
-];
-
-function cleanText(text) {
-  return Array.from(String(text || ""))
-    .map((ch) => ch.replace(/[ァ-ヶ]/, (s) => String.fromCharCode(s.charCodeAt(0) - 0x60)))
-    .filter((ch) => ![" ", "　", ",", "、", "/", "・", "\n", "\t", "。", "，"].includes(ch))
-    .join("");
-}
-
-function parseWords(text) {
-  return Array.from(new Set(String(text || "")
-    .split(/[\s,、/・。]+/)
-    .map(cleanText)
-    .filter((word) => word.length >= 2)));
-}
-
-function makeDictionary(userWords = []) {
-  return Array.from(new Set([...BASE_WORDS.map(cleanText), ...userWords.map(cleanText)]))
-    .filter(Boolean)
-    .map((word) => ({ word, label: word, score: word.length * 10 + (word.length >= 3 ? 15 : 0) }));
-}
-
-function shuffle(list) {
-  const arr = [...list];
-  for (let i = arr.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}
-
-function makeTile(char, prefix = "tile") {
-  return { id: `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`, char };
-}
-
-function buildDeck() {
-  return shuffle(TILE_POOL.map((char) => makeTile(char)));
-}
-
-function createGame({ mode, handSize, manualText }) {
-  const deck = buildDeck();
-  if (mode === "manual") {
-    return {
-      hand: Array.from(cleanText(manualText)).map((char) => makeTile(char, "manual")),
-      wall: deck,
-      fixedBlocks: [],
-      discarded: [],
-      hasDrawnThisTurn: false,
-    };
-  }
-  return {
-    hand: deck.slice(0, handSize),
-    wall: deck.slice(handSize),
-    fixedBlocks: [],
-    discarded: [],
-    hasDrawnThisTurn: false,
-  };
-}
-
-function isConfirmedBlock(block) {
-  return block.confirmed !== false;
-}
-
-function getConfirmedBlocks(fixedBlocks) {
-  return fixedBlocks.filter(isConfirmedBlock);
-}
-
-function getKanDrawCount(block) {
-  return Math.max(0, (block?.tiles?.length || 0) - 3);
-}
-
-function canMakeWord(word, tiles) {
-  const remain = tiles.map((tile) => tile.char);
-  for (const ch of word) {
-    const idx = remain.indexOf(ch);
-    if (idx < 0) return false;
-    remain.splice(idx, 1);
-  }
-  return true;
-}
-
-function getWordsFromTiles(tiles, dictionary) {
-  return dictionary.filter((entry) => canMakeWord(entry.word, tiles))
-    .sort((a, b) => b.word.length - a.word.length || b.score - a.score || a.word.localeCompare(b.word, "ja"))
-    .slice(0, 36);
-}
-
-function getWaits(tiles, dictionary) {
+function cleanText(text) { return Array.from(String(text || "")).map((ch) => ch.replace(/[ァ-ヶ]/, (s) => String.fromCharCode(s.charCodeAt(0) - 0x60))).filter((ch) => ![" ", "　", ",", "、", "/", "・", "\n", "\t", "。", "，"].includes(ch)).join(""); }
+function parseWords(text) { return Array.from(new Set(String(text || "").split(/[\s,、/・。]+/).map(cleanText).filter((word) => word.length >= 2))); }
+function normalizeUserWords(words) { return Array.from(new Set((words || []).map(cleanText).filter((word) => word && !BASE_WORD_SET.has(word)))); }
+function makeDictionary(userWords = []) { return Array.from(new Set([...BASE_WORDS.map(cleanText), ...normalizeUserWords(userWords)])).filter(Boolean).map((word) => ({ word, label: word, score: word.length * 10 + (word.length >= 3 ? 15 : 0) })); }
+function shuffle(list) { const arr = [...list]; for (let i = arr.length - 1; i > 0; i -= 1) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; }
+function makeTile(char, prefix = "tile") { return { id: `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`, char }; }
+function buildDeck() { return shuffle(TILE_POOL.map((char) => makeTile(char))); }
+function removeCharsFromDeck(deck, chars) { const remaining = [...deck]; for (const ch of chars) { const idx = remaining.findIndex((tile) => tile.char === ch); if (idx >= 0) remaining.splice(idx, 1); } return remaining; }
+function createGame({ mode, handSize, manualText }) { const deck = buildDeck(); if (mode === "manual") { const chars = Array.from(cleanText(manualText)); const hand = chars.map((char) => makeTile(char, "manual")); return { hand, wall: removeCharsFromDeck(deck, chars), fixedBlocks: [], discarded: [], hasDrawnThisTurn: false }; } return { hand: deck.slice(0, handSize), wall: deck.slice(handSize), fixedBlocks: [], discarded: [], hasDrawnThisTurn: false }; }
+function isConfirmedBlock(block) { return block.confirmed !== false; }
+function getConfirmedBlocks(fixedBlocks) { return fixedBlocks.filter(isConfirmedBlock); }
+function getKanDrawCount(block) { return Math.max(0, (block?.tiles?.length || 0) - 3); }
+function blockToWord(block) { return cleanText((block?.tiles || []).map((tile) => tile.char).join("")); }
+function canMakeWord(word, tiles) { const remain = tiles.map((tile) => tile.char); for (const ch of word) { const idx = remain.indexOf(ch); if (idx < 0) return false; remain.splice(idx, 1); } return true; }
+function getWordsFromTiles(tiles, dictionary) { return dictionary.filter((entry) => canMakeWord(entry.word, tiles)).sort((a, b) => b.word.length - a.word.length || b.score - a.score || a.word.localeCompare(b.word, "ja")).slice(0, 36); }
+function getWaits(tiles, dictionary) { const chars = tiles.map((tile) => tile.char); const waits = []; for (const entry of dictionary) { const remain = [...chars]; const missing = []; for (const ch of entry.word) { const idx = remain.indexOf(ch); if (idx >= 0) remain.splice(idx, 1); else missing.push(ch); } if (missing.length === 1) waits.push({ ...entry, wait: missing[0] }); } return waits.sort((a, b) => b.word.length - a.word.length || b.score - a.score || a.word.localeCompare(b.word, "ja")).slice(0, 30); }
+function consumeWordChars(chars, word) { const remaining = [...chars]; for (const ch of word) { const idx = remaining.indexOf(ch); if (idx < 0) return null; remaining.splice(idx, 1); } return remaining; }
+function getRecombinableTiles(hand, fixedBlocks) { const nonKanFixedTiles = fixedBlocks.filter((block) => !(isConfirmedBlock(block) && ((block.kanDrawCount ?? 0) > 0 || getKanDrawCount(block) > 0))).flatMap((block) => block.tiles || []); return [...hand, ...nonKanFixedTiles]; }
+function getWordPlansFromTiles(tiles, dictionary) {
   const chars = tiles.map((tile) => tile.char);
-  const waits = [];
-  for (const entry of dictionary) {
-    const remain = [...chars];
-    const missing = [];
-    for (const ch of entry.word) {
-      const idx = remain.indexOf(ch);
-      if (idx >= 0) remain.splice(idx, 1);
-      else missing.push(ch);
-    }
-    if (missing.length === 1) waits.push({ ...entry, wait: missing[0] });
-  }
-  return waits.sort((a, b) => b.word.length - a.word.length || b.score - a.score || a.word.localeCompare(b.word, "ja")).slice(0, 30);
-}
-
-function getCompletionStatus(fixedBlocks) {
-  const confirmedBlocks = getConfirmedBlocks(fixedBlocks);
-  const lengths = confirmedBlocks.map((block) => block.tiles.length);
-  const pairCount = lengths.filter((len) => len === 2).length;
-  const mentsuCount = lengths.filter((len) => len >= 3).length;
-  const tentativeCount = fixedBlocks.length - confirmedBlocks.length;
-  const lockedTileCount = confirmedBlocks.reduce((sum, block) => sum + block.tiles.length, 0);
-  if (pairCount >= 7) return { complete: true, title: "七対子型の完成候補", detail: `確定済みの2枚ブロックが${pairCount}個あります。`, pairCount, mentsuCount, lockedTileCount, tentativeCount };
-  if (mentsuCount >= 4 && pairCount >= 1) return { complete: true, title: "4メンツ＋雀頭型の完成候補", detail: `確定済みメンツ${mentsuCount}個、雀頭${pairCount}個があります。`, pairCount, mentsuCount, lockedTileCount, tentativeCount };
-  return { complete: false, title: "まだ完成ではありません", detail: `確定済みメンツ${mentsuCount}個、雀頭${pairCount}個です。`, pairCount, mentsuCount, lockedTileCount, tentativeCount };
-}
-
-function Tile({ tile, selected, onClick, disabled = false }) {
-  return (
-    <button type="button" disabled={disabled} onClick={onClick} className={`grid h-12 w-10 shrink-0 place-items-center rounded-xl border-2 bg-gradient-to-b from-white to-stone-100 text-xl font-black shadow-sm transition active:scale-95 disabled:opacity-60 sm:h-14 sm:w-11 sm:text-2xl ${selected ? "border-emerald-500 ring-4 ring-emerald-100" : "border-stone-300"}`}>
-      {tile.char}
-    </button>
-  );
-}
-
-function AdBox({ label }) {
-  return <div className="grid h-10 shrink-0 place-items-center rounded-2xl border border-dashed border-stone-300 bg-stone-50 px-3 text-center text-[11px] text-stone-400 sm:h-12 sm:text-xs">{label} / AdMob差し替え予定</div>;
-}
-
-function Modal({ title, children, onClose }) {
-  return (
-    <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-black/40 p-3 sm:p-4">
-      <div className="w-full max-w-lg rounded-3xl bg-white p-4 shadow-xl sm:p-5">
-        <h2 className="mb-3 text-lg font-black sm:text-xl">{title}</h2>
-        {children}
-        <button type="button" onClick={onClose} className="mt-4 rounded-2xl border px-4 py-2">閉じる</button>
-      </div>
-    </div>
-  );
-}
-
-function CompletionCard({ status }) {
-  return (
-    <div className={`shrink-0 rounded-3xl border p-3 text-sm ${status.complete ? "border-amber-300 bg-amber-50 text-amber-950" : "border-stone-200 bg-white"}`}>
-      <div className="flex flex-wrap items-center gap-2">
-        <span className={`rounded-full px-3 py-1 text-xs font-bold ${status.complete ? "bg-amber-500 text-white" : "bg-stone-100"}`}>{status.complete ? "完成候補" : "未完成"}</span>
-        <b>{status.title}</b>
-        {status.tentativeCount > 0 && <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-bold text-sky-800">仮固定 {status.tentativeCount}</span>}
-      </div>
-      <div className="mt-2 grid grid-cols-3 gap-2 text-center text-xs">
-        <div className="rounded-2xl bg-white/80 p-2"><b className="block text-base">{status.mentsuCount}</b>確定メンツ</div>
-        <div className="rounded-2xl bg-white/80 p-2"><b className="block text-base">{status.pairCount}</b>確定雀頭</div>
-        <div className="rounded-2xl bg-white/80 p-2"><b className="block text-base">{status.lockedTileCount}</b>確定牌</div>
-      </div>
-      <p className="mt-2 text-xs opacity-80">{status.detail}</p>
-    </div>
-  );
-}
-
-function AssistPanel({ level, hand, fixedBlocks, selectedTiles, dictionary }) {
-  const words = useMemo(() => getWordsFromTiles(hand, dictionary), [hand, dictionary]);
-  const waits = useMemo(() => getWaits(hand, dictionary), [hand, dictionary]);
-  const status = useMemo(() => getCompletionStatus(fixedBlocks), [fixedBlocks]);
-  const selectedText = selectedTiles.map((tile) => tile.char).join("");
-  const score = Math.min(100, status.mentsuCount * 22 + status.pairCount * 12 + words.length * 7 + waits.length * 3);
-
-  if (level === 0) {
-    return <aside className="flex h-full min-h-0 flex-col overflow-hidden rounded-3xl bg-white p-4 shadow-sm"><h2 className="mb-2 flex items-center gap-2 font-black"><Sparkles size={18} />アシスト Lv0</h2><p className="text-sm text-stone-500">完全ノーアシストです。</p></aside>;
-  }
-
-  const longWords = words.filter((entry) => entry.word.length >= 3);
-  const pairWords = words.filter((entry) => entry.word.length === 2);
-
-  return (
-    <aside className="flex h-full min-h-0 flex-col overflow-hidden rounded-3xl bg-white p-4 shadow-sm">
-      <div className="mb-3 flex items-center justify-between gap-2"><h2 className="flex items-center gap-2 font-black"><Sparkles size={18} />アシスト Lv{level}</h2>{level >= 2 && <span className="rounded-full bg-stone-100 px-3 py-1 text-xs font-bold">形評価 {score}</span>}</div>
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1 sm:pr-2">
-        <section><h3 className="mb-2 font-bold">待ち候補</h3>{waits.length ? <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">{waits.map((w, i) => <div key={`${w.word}-${i}`} className="rounded-2xl bg-emerald-50 p-2 text-sm text-emerald-900"><b>{w.word}</b> <span className="text-xs">待ち:{w.wait}</span></div>)}</div> : <p className="text-sm text-stone-400">待ち候補なし</p>}</section>
-        {level >= 2 && <section><h3 className="mb-2 font-bold">3文字以上の候補</h3><div className="flex flex-wrap gap-2">{longWords.length ? longWords.slice(0, 24).map((entry) => <span key={entry.word} className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-900">{entry.word}</span>) : <p className="text-sm text-stone-400">3文字以上の成立候補なし</p>}</div></section>}
-        {level >= 2 && <section><h3 className="mb-2 font-bold">雀頭候補</h3><div className="flex flex-wrap gap-2">{pairWords.length ? pairWords.slice(0, 12).map((entry) => <span key={entry.word} className="rounded-full border px-3 py-1 text-xs font-bold">{entry.word}</span>) : <p className="text-sm text-stone-400">2文字候補なし</p>}</div></section>}
-        {level >= 3 && <section className="rounded-2xl bg-amber-50 p-3 text-sm text-amber-950"><h3 className="mb-2 font-bold">おすすめ</h3><p>固定候補：{selectedText || longWords[0]?.word || words[0]?.word || "まず2〜3枚選択"}</p><p>捨て牌候補：{hand.at(-1)?.char || "-"}</p><p className="mt-2 text-xs text-amber-700">3文字以上の語を優先して、長めのメンツを作りやすくしています。</p></section>}
-      </div>
-    </aside>
-  );
-}
-
-function HomeScreen({ onStart, savedGame, onLoadSaved, onClearSaved, userWords, onAddUserWords }) {
-  const [mode, setMode] = useState("random");
-  const [handSize, setHandSize] = useState(13);
-  const [assistLevel, setAssistLevel] = useState(2);
-  const [manualText, setManualText] = useState("さくらうみねこ");
-  const [requestText, setRequestText] = useState("");
-  const [contactText, setContactText] = useState("");
-  const [modal, setModal] = useState(null);
-  const parsedRequestWords = useMemo(() => parseWords(requestText).filter((word) => word.length >= 3), [requestText]);
-
-  const submitRequestWords = () => {
-    const added = onAddUserWords(parsedRequestWords);
-    if (added.length) {
-      setRequestText("");
-      setModal("words-added");
-    } else {
-      alert("追加できる3文字以上の単語が見つかりませんでした。空白・読点・スラッシュ区切りで入力してください。");
-    }
+  const base = dictionary.filter((entry) => entry.word.length >= 2 && consumeWordChars(chars, entry.word)).sort((a, b) => b.word.length - a.word.length || b.score - a.score || a.word.localeCompare(b.word, "ja")).slice(0, 36);
+  const plans = [];
+  const seen = new Set();
+  const addPlan = (words, kind) => {
+    const pairCount = words.filter((word) => word.length === 2).length;
+    const mentsuCount = words.filter((word) => word.length >= 3).length;
+    const isSevenPairsLike = pairCount >= 2 && mentsuCount === 0;
+    if (pairCount > 1 && !isSevenPairsLike) return;
+    if (isSevenPairsLike && pairCount > 7) return;
+    if (pairCount === 1 && mentsuCount > 4) return;
+    if (pairCount === 0 && mentsuCount > 4) return;
+    let remaining = [...chars];
+    for (const word of words) { const next = consumeWordChars(remaining, word); if (!next) return; remaining = next; }
+    const planKind = isSevenPairsLike ? "七対子候補" : kind;
+    const key = `${planKind}:${words.join("/")}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    const used = chars.length - remaining.length;
+    const longCount = words.filter((word) => word.length >= 3).length;
+    const score = (isSevenPairsLike ? 70 + pairCount * 18 : 0) + mentsuCount * 40 + pairCount * 18 + Math.max(...words.map((word) => word.length)) * 12 + longCount * 10 + used;
+    plans.push({ words, remaining, used, score, kind: planKind, pairCount, mentsuCount });
   };
-
-  return (
-    <div className="min-h-[100dvh] bg-gradient-to-br from-emerald-50 via-white to-stone-100 p-3 text-stone-900 sm:p-4">
-      <div className="mx-auto flex min-h-[calc(100dvh-24px)] max-w-5xl flex-col justify-between gap-4 sm:min-h-[calc(100dvh-32px)]">
-        <div className="space-y-4">
-          <header className="rounded-[1.5rem] bg-emerald-700 p-5 text-white shadow-lg sm:rounded-[2rem] sm:p-6">
-            <div className="text-xs font-bold text-emerald-100 sm:text-sm">Solo Practice v1</div>
-            <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">Hiragana Mahjong</h1>
-            <p className="mt-2 text-sm text-emerald-50">ひらがな牌で言葉を作る、ソロ練習用アシストアプリ。</p>
-          </header>
-          {savedGame && <section className="rounded-3xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm"><div className="font-bold text-emerald-900">保存中の練習があります</div><p className="mt-1 text-sm text-emerald-800">手牌 {savedGame.hand?.length || 0}枚 / 固定 {savedGame.fixedBlocks?.length || 0}ブロック / 捨て牌 {savedGame.discarded?.length || 0}枚</p><div className="mt-3 flex flex-wrap gap-2"><button type="button" onClick={onLoadSaved} className="rounded-2xl bg-emerald-700 px-4 py-2 font-bold text-white">再開する</button><button type="button" onClick={onClearSaved} className="rounded-2xl border bg-white px-4 py-2">削除</button></div></section>}
-          <section className="rounded-3xl bg-white p-4 shadow-sm sm:p-5">
-            <h2 className="mb-4 text-xl font-black">開始設定</h2>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <label className="text-sm font-bold">開始方法</label>
-                <div className="mt-2 grid grid-cols-2 rounded-2xl bg-stone-100 p-1">
-                  <button type="button" onClick={() => setMode("random")} className={`rounded-xl px-4 py-2 font-bold ${mode === "random" ? "bg-emerald-700 text-white" : ""}`}>ランダム</button>
-                  <button type="button" onClick={() => setMode("manual")} className={`rounded-xl px-4 py-2 font-bold ${mode === "manual" ? "bg-emerald-700 text-white" : ""}`}>手動</button>
-                </div>
-                {mode === "manual" && <input value={manualText} onChange={(e) => setManualText(e.target.value)} className="mt-3 w-full rounded-2xl border p-3" placeholder="例：さくらうみねこ" />}
-              </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <label className="text-sm font-bold">手牌枚数<select value={handSize} onChange={(e) => setHandSize(Number(e.target.value))} className="mt-2 w-full rounded-2xl border bg-white p-3">{[7, 10, 13, 16, 20].map((n) => <option key={n} value={n}>{n}枚</option>)}</select></label>
-                <label className="text-sm font-bold">アシストLv<select value={assistLevel} onChange={(e) => setAssistLevel(Number(e.target.value))} className="mt-2 w-full rounded-2xl border bg-white p-3">{[0, 1, 2, 3].map((n) => <option key={n} value={n}>Lv{n}</option>)}</select></label>
-              </div>
-            </div>
-            <div className="mt-4 rounded-2xl bg-stone-50 p-3 text-xs text-stone-600">追加済みユーザー単語：<b>{userWords.length}</b>語。要望欄から3文字以上の単語を即時追加できます。</div>
-            <div className="mt-5 grid gap-2 sm:flex sm:flex-wrap">
-              <button type="button" onClick={() => setModal("help")} className="rounded-2xl border px-4 py-2"><HelpCircle className="mr-2 inline" size={16} />遊び方</button>
-              <button type="button" onClick={() => setModal("feedback")} className="rounded-2xl border px-4 py-2"><MessageSquareText className="mr-2 inline" size={16} />要望/単語追加</button>
-              <button type="button" onClick={() => onStart({ mode, handSize, assistLevel, manualText })} className="rounded-2xl bg-emerald-700 px-8 py-3 font-bold text-white sm:ml-auto sm:py-2"><Shuffle className="mr-2 inline" size={16} />開始する</button>
-            </div>
-          </section>
-        </div>
-        <AdBox label="ホーム下部広告枠" />
-      </div>
-      {modal === "help" && <Modal title="ソロ練習の遊び方" onClose={() => setModal(null)}><div className="space-y-2 text-sm text-stone-700"><p>手牌から文字を選び、「仮固定」で候補ブロックにします。</p><p>仮固定を「確定」するとブロックが完成扱いになります。4枚以上のブロックは槓扱いになり、確定時に枚数-3枚を追加で自摸します。</p><p>「1枚引く」で1枚だけ引き、不要な牌を選んで「捨てる」。1枚引いた後は、捨てるまで次の牌は引けません。</p><p>Lv1は待ち候補、Lv2は候補と形評価、Lv3はおすすめまで表示します。</p></div></Modal>}
-      {modal === "feedback" && <Modal title="要望/単語追加" onClose={() => setModal(null)}><div className="space-y-3"><input value={contactText} onChange={(e) => setContactText(e.target.value)} className="w-full rounded-2xl border p-3" placeholder="返信先メール（任意）" /><textarea value={requestText} onChange={(e) => setRequestText(e.target.value)} className="w-full rounded-2xl border p-3" rows={5} placeholder="追加したい単語や要望。例：かたつむり、しゃぼんだま / ゆきだるま" /><div className="rounded-2xl bg-emerald-50 p-3 text-xs text-emerald-900">検出中の3文字以上単語：{parsedRequestWords.length ? parsedRequestWords.join("、") : "なし"}</div><button type="button" onClick={submitRequestWords} className="w-full rounded-2xl bg-emerald-700 px-4 py-3 font-bold text-white sm:w-auto sm:py-2"><PlusCircle className="mr-2 inline" size={16} />単語を追加する</button><p className="text-xs text-stone-500">現時点では端末内保存です。送信機能をFirebase等につなぐ前でも、候補辞書には即時反映されます。</p></div></Modal>}
-      {modal === "words-added" && <Modal title="単語を追加しました" onClose={() => setModal(null)}><p className="text-sm text-stone-700">追加した単語はこの端末に保存され、待ち候補・メンツ候補に反映されます。</p></Modal>}
-    </div>
-  );
+  const pairBase = base.filter((entry) => entry.word.length === 2).slice(0, 24);
+  const addPairPlan = (seedIndex = null) => { let remaining = [...chars]; const words = []; const ordered = seedIndex == null ? pairBase : [pairBase[seedIndex], ...pairBase.filter((_, i) => i !== seedIndex)]; for (const entry of ordered) { if (words.length >= 7) break; const next = consumeWordChars(remaining, entry.word); if (!next) continue; words.push(entry.word); remaining = next; } if (words.length >= 2) addPlan(words, "七対子候補"); };
+  addPairPlan(null); pairBase.slice(0, 12).forEach((_, index) => addPairPlan(index));
+  base.slice(0, 16).forEach((entry) => addPlan([entry.word], entry.word.length === 2 ? "雀頭候補" : "単独"));
+  for (let i = 0; i < Math.min(base.length, 14); i += 1) for (let j = i + 1; j < Math.min(base.length, 18); j += 1) addPlan([base[i].word, base[j].word], "2候補");
+  for (let i = 0; i < Math.min(base.length, 8); i += 1) for (let j = i + 1; j < Math.min(base.length, 10); j += 1) for (let k = j + 1; k < Math.min(base.length, 12); k += 1) addPlan([base[i].word, base[j].word, base[k].word], "3候補");
+  return plans.sort((a, b) => b.score - a.score || b.mentsuCount - a.mentsuCount || b.pairCount - a.pairCount || a.remaining.length - b.remaining.length || a.words.join("").localeCompare(b.words.join(""), "ja")).slice(0, 12);
 }
-
-function SoloPlayScreen({ settings, onBack, dictionary }) {
-  const initialGame = useMemo(() => settings.savedState || createGame(settings), [settings]);
-  const [hand, setHand] = useState(initialGame.hand || []);
-  const [wall, setWall] = useState(initialGame.wall || []);
-  const [fixedBlocks, setFixedBlocks] = useState(initialGame.fixedBlocks || []);
-  const [discarded, setDiscarded] = useState(initialGame.discarded || []);
-  const [hasDrawnThisTurn, setHasDrawnThisTurn] = useState(initialGame.hasDrawnThisTurn || false);
-  const [selectedIds, setSelectedIds] = useState([]);
-  const [assistLevel, setAssistLevel] = useState(settings.savedState?.assistLevel ?? settings.assistLevel);
-  const [exitOpen, setExitOpen] = useState(false);
-  const selectedTiles = hand.filter((tile) => selectedIds.includes(tile.id));
-  const completionStatus = useMemo(() => getCompletionStatus(fixedBlocks), [fixedBlocks]);
-  const finishText = [completionStatus.title, completionStatus.detail].join(String.fromCharCode(10));
-  const drawOne = () => { if (hasDrawnThisTurn || wall.length === 0) return; setHand((prev) => [...prev, wall[0]]); setWall((prev) => prev.slice(1)); setHasDrawnThisTurn(true); };
-  const discardSelected = () => { if (!hasDrawnThisTurn || selectedTiles.length !== 1) return; setDiscarded((prev) => [...prev, ...selectedTiles]); setHand((prev) => prev.filter((tile) => !selectedIds.includes(tile.id))); setSelectedIds([]); setHasDrawnThisTurn(false); };
-  const fixSelected = () => { if (!selectedTiles.length) return; setFixedBlocks((prev) => [...prev, { id: `block-${Date.now()}`, tiles: selectedTiles, confirmed: false }]); setHand((prev) => prev.filter((tile) => !selectedIds.includes(tile.id))); setSelectedIds([]); };
-  const confirmFixedBlock = (blockId) => {
-    const target = fixedBlocks.find((block) => block.id === blockId);
-    if (!target || isConfirmedBlock(target)) return;
-    const drawCount = Math.min(getKanDrawCount(target), wall.length);
-    const kanDraws = wall.slice(0, drawCount);
-    setFixedBlocks((prev) => prev.map((block) => block.id === blockId ? { ...block, confirmed: true, kanDrawCount: drawCount } : block));
-    if (drawCount > 0) {
-      setHand((prev) => [...prev, ...kanDraws]);
-      setWall((prev) => prev.slice(drawCount));
-    }
-  };
-  const returnFixedBlock = (blockId) => { setFixedBlocks((prev) => { const target = prev.find((block) => block.id === blockId); if (!target) return prev; setHand((h) => [...h, ...target.tiles]); return prev.filter((block) => block.id !== blockId); }); };
-  const undoLastBlock = () => { if (fixedBlocks.length) returnFixedBlock(fixedBlocks[fixedBlocks.length - 1].id); };
-  const reset = () => { const next = createGame({ mode: "random", handSize: settings.handSize || 13 }); setHand(next.hand); setWall(next.wall); setFixedBlocks([]); setDiscarded([]); setSelectedIds([]); setHasDrawnThisTurn(false); };
-  const makeSaveData = () => ({ hand, wall, fixedBlocks, discarded, hasDrawnThisTurn, assistLevel, savedAt: Date.now(), settings: { ...settings, savedState: undefined } });
-
-  return (
-    <div className="min-h-[100dvh] bg-stone-100 p-2 text-stone-900 sm:p-3 lg:h-screen lg:overflow-hidden">
-      <div className="mx-auto grid min-h-[calc(100dvh-16px)] max-w-7xl gap-3 lg:h-full lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <main className="flex min-h-0 flex-col gap-3 lg:overflow-hidden">
-          <header className="flex shrink-0 flex-wrap items-center gap-2 rounded-3xl bg-emerald-700 p-3 text-white shadow-sm">
-            <button type="button" onClick={() => setExitOpen(true)} className="rounded-2xl bg-white px-3 py-2 font-bold text-emerald-800"><Home className="mr-1 inline" size={16} />ホーム</button>
-            <strong>ソロ練習</strong>
-            <span className="ml-auto rounded-full bg-white px-3 py-1 text-xs font-bold text-emerald-800">山 {wall.length}</span>
-            <select value={assistLevel} onChange={(e) => setAssistLevel(Number(e.target.value))} className="rounded-2xl bg-white p-2 text-stone-900">{[0, 1, 2, 3].map((n) => <option key={n} value={n}>Lv{n}</option>)}</select>
-          </header>
-          <section className="shrink-0 rounded-3xl bg-white p-3 shadow-sm sm:p-4"><h2 className="mb-2 font-bold">手牌</h2><div className="flex max-h-44 min-h-20 flex-wrap gap-2 overflow-y-auto rounded-3xl bg-emerald-900/5 p-2 pr-2 sm:max-h-32 sm:p-3">{hand.map((tile) => <Tile key={tile.id} tile={tile} selected={selectedIds.includes(tile.id)} onClick={() => setSelectedIds((prev) => prev.includes(tile.id) ? prev.filter((x) => x !== tile.id) : [...prev, tile.id])} />)}</div></section>
-          <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-2 lg:overflow-hidden">
-            <section className="flex min-h-0 flex-col overflow-hidden rounded-3xl bg-white p-3 shadow-sm sm:p-4"><h2 className="mb-2 shrink-0 font-bold">固定ブロック</h2><div className="max-h-64 min-h-32 flex-1 space-y-2 overflow-y-auto pr-1 lg:max-h-none lg:min-h-0 lg:pr-2">{fixedBlocks.length ? fixedBlocks.map((block, i) => { const drawCount = getKanDrawCount(block); const confirmed = isConfirmedBlock(block); return <div key={block.id} className={`flex items-center gap-2 overflow-x-auto rounded-2xl p-2 ${confirmed ? "bg-stone-50" : "bg-sky-50 ring-2 ring-sky-100"}`}><span className={`shrink-0 rounded-full px-2 py-1 text-xs font-bold ${confirmed ? "bg-stone-200" : "bg-sky-600 text-white"}`}>{confirmed ? i + 1 : "仮"}</span><div className="flex gap-1">{block.tiles.map((tile) => <Tile key={tile.id} tile={tile} disabled />)}</div>{!confirmed && <button type="button" onClick={() => confirmFixedBlock(block.id)} className="ml-auto shrink-0 rounded-xl bg-emerald-700 px-3 py-2 text-sm font-bold text-white">確定{drawCount > 0 ? `＋${drawCount}自摸` : ""}</button>}{confirmed && block.kanDrawCount > 0 && <span className="ml-auto shrink-0 rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">槓自摸 +{block.kanDrawCount}</span>}<button type="button" onClick={() => returnFixedBlock(block.id)} className={`${confirmed && block.kanDrawCount > 0 ? "" : confirmed ? "ml-auto" : ""} shrink-0 rounded-xl border bg-white px-3 py-2 text-sm`}>戻す</button></div>; }) : <p className="text-sm text-stone-400">まだ固定なし</p>}</div></section>
-            <section className="flex min-h-0 flex-col overflow-hidden rounded-3xl bg-white p-3 shadow-sm sm:p-4"><h2 className="mb-2 shrink-0 font-bold">捨て牌</h2><div className="grid max-h-48 min-h-32 flex-1 grid-cols-5 content-start gap-2 overflow-y-auto rounded-2xl bg-stone-50 p-2 pr-1 sm:grid-cols-6 sm:p-3 lg:max-h-none lg:min-h-0 lg:pr-2">{discarded.map((tile) => <Tile key={tile.id} tile={tile} disabled />)}</div></section>
-          </div>
-          <CompletionCard status={completionStatus} />
-          <div className="grid shrink-0 grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-6"><button type="button" disabled={hasDrawnThisTurn || wall.length === 0} onClick={drawOne} className="rounded-2xl bg-emerald-700 px-3 py-3 font-bold text-white disabled:opacity-40 sm:py-2">1枚引く</button><button type="button" disabled={!selectedTiles.length} onClick={fixSelected} className="rounded-2xl border bg-white px-3 py-3 font-bold disabled:opacity-40 sm:py-2">仮固定</button><button type="button" disabled={!fixedBlocks.length} onClick={undoLastBlock} className="rounded-2xl border bg-white px-3 py-3 font-bold disabled:opacity-40 sm:py-2"><Undo2 className="mr-1 inline" size={16} />最後を戻す</button><button type="button" disabled={!hasDrawnThisTurn || selectedTiles.length !== 1} onClick={discardSelected} className="rounded-2xl bg-red-600 px-3 py-3 font-bold text-white disabled:opacity-40 sm:py-2"><Trash2 className="mr-1 inline" size={16} />捨てる</button><button type="button" onClick={() => alert(finishText)} className={`rounded-2xl px-3 py-3 font-bold sm:py-2 ${completionStatus.complete ? "bg-amber-500 text-white" : "bg-white border"}`}>完成判定</button><button type="button" onClick={reset} className="rounded-2xl border bg-white px-3 py-3 font-bold sm:py-2"><RotateCcw className="mr-1 inline" size={16} />リセット</button></div>
-          <AdBox label="プレイ画面下部広告枠" />
-        </main>
-        <div className="min-h-[360px] overflow-hidden lg:min-h-0"><AssistPanel level={assistLevel} hand={hand} fixedBlocks={fixedBlocks} selectedTiles={selectedTiles} dictionary={dictionary} /></div>
-      </div>
-      {exitOpen && <Modal title="練習を終了しますか？" onClose={() => setExitOpen(false)}><p className="mb-4 text-sm text-stone-600">現在の手牌・固定ブロック・捨て牌を保存してホームに戻れます。</p><div className="flex flex-wrap gap-2"><button type="button" onClick={() => onBack(makeSaveData())} className="rounded-2xl bg-emerald-700 px-4 py-2 font-bold text-white"><Save className="mr-2 inline" size={16} />保存して終了</button><button type="button" onClick={() => onBack(null)} className="rounded-2xl bg-red-600 px-4 py-2 font-bold text-white">保存せず終了</button></div></Modal>}
-    </div>
-  );
-}
-
-export default function App() {
-  const [screen, setScreen] = useState("home");
-  const [settings, setSettings] = useState(null);
-  const [savedGame, setSavedGame] = useState(() => { try { const raw = typeof window !== "undefined" ? window.localStorage.getItem(SAVE_KEY) : null; return raw ? JSON.parse(raw) : null; } catch { return null; } });
-  const [userWords, setUserWords] = useState(() => { try { const raw = typeof window !== "undefined" ? window.localStorage.getItem(USER_WORDS_KEY) : null; return raw ? JSON.parse(raw) : []; } catch { return []; } });
-  const dictionary = useMemo(() => makeDictionary(userWords), [userWords]);
-
-  const addUserWords = (words) => {
-    const cleaned = parseWords(words.join(" ")).filter((word) => word.length >= 3);
-    const existing = new Set(userWords.map(cleanText));
-    const added = cleaned.filter((word) => !existing.has(word));
-    if (!added.length) return [];
-    const next = [...userWords, ...added];
-    setUserWords(next);
-    if (typeof window !== "undefined") window.localStorage.setItem(USER_WORDS_KEY, JSON.stringify(next));
-    return added;
-  };
-
-  const start = (nextSettings) => { setSettings(nextSettings); setScreen("play"); };
-  const backToHome = (saveData) => { if (saveData) { setSavedGame(saveData); if (typeof window !== "undefined") window.localStorage.setItem(SAVE_KEY, JSON.stringify(saveData)); } setScreen("home"); };
-  const loadSaved = () => { if (!savedGame) return; setSettings({ ...(savedGame.settings || {}), savedState: savedGame }); setScreen("play"); };
-  const clearSaved = () => { setSavedGame(null); if (typeof window !== "undefined") window.localStorage.removeItem(SAVE_KEY); };
-  if (screen === "play" && settings) return <SoloPlayScreen settings={settings} onBack={backToHome} dictionary={dictionary} />;
-  return <HomeScreen onStart={start} savedGame={savedGame} onLoadSaved={loadSaved} onClearSaved={clearSaved} userWords={userWords} onAddUserWords={addUserWords} />;
-}
+function getCompletionStatus(fixedBlocks) { const confirmedBlocks = getConfirmedBlocks(fixedBlocks); const lengths = confirmedBlocks.map((block) => block.tiles.length); const pairCount = lengths.filter((len) => len === 2).length; const mentsuCount = lengths.filter((len) => len >= 3).length; const tentativeCount = fixedBlocks.length - confirmedBlocks.length; const lockedTileCount = confirmedBlocks.reduce((sum, block) => sum + block.tiles.length, 0); if (pairCount >= 7) return { complete: true, title: "七対子型の完成候補", detail: `確定済みの2枚ブロックが${pairCount}個あります。`, pairCount, mentsuCount, lockedTileCount, tentativeCount }; if (mentsuCount >= 4 && pairCount >= 1) return { complete: true, title: "4メンツ＋雀頭型の完成候補", detail: `確定済みメンツ${mentsuCount}個、雀頭${pairCount}個があります。`, pairCount, mentsuCount, lockedTileCount, tentativeCount }; return { complete: false, title: "まだ完成ではありません", detail: `確定済みメンツ${mentsuCount}個、雀頭${pairCount}個です。`, pairCount, mentsuCount, lockedTileCount, tentativeCount }; }
+function Tile({ tile, selected, onClick, disabled = false }) { return <button type="button" disabled={disabled} onClick={onClick} className={`grid h-12 w-10 shrink-0 place-items-center rounded-xl border-2 bg-gradient-to-b from-white to-stone-100 text-xl font-black shadow-sm transition active:scale-95 disabled:opacity-60 sm:h-14 sm:w-11 sm:text-2xl ${selected ? "border-emerald-500 ring-4 ring-emerald-100" : "border-stone-300"}`}>{tile.char}</button>; }
+function AdBox({ label }) { return <div className="grid h-10 shrink-0 place-items-center rounded-2xl border border-dashed border-stone-300 bg-stone-50 px-3 text-center text-[11px] text-stone-400 sm:h-12 sm:text-xs">{label} / AdMob差し替え予定</div>; }
+function Modal({ title, children, onClose }) { return <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-black/40 p-4"><div className="w-full max-w-lg rounded-3xl bg-white p-4 shadow-xl sm:p-5"><h2 className="mb-3 text-lg font-black sm:text-xl">{title}</h2>{children}<button type="button" onClick={onClose} className="mt-4 rounded-2xl border px-4 py-2">閉じる</button></div></div>; }
+function TilePickerModal({ title, note, counts, onPick, onClose, closeLabel = "閉じる" }) { const total = Object.values(counts).reduce((sum, count) => sum + count, 0); return <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-black/40 p-3 sm:p-4"><div className="w-full max-w-2xl rounded-3xl bg-white p-4 shadow-xl sm:p-5"><div className="mb-3 flex items-start justify-between gap-3"><div><h2 className="text-lg font-black sm:text-xl">{title}</h2>{note && <p className="mt-1 text-sm text-stone-600">{note}</p>}</div>{onClose && <button type="button" onClick={onClose} className="shrink-0 rounded-2xl border px-3 py-2 text-sm">{closeLabel}</button>}</div><div className="space-y-2">{TILE_PANEL_GROUPS.map((group, groupIndex) => <div key={groupIndex} className="flex flex-wrap gap-1.5">{group.map((char) => { const count = counts[char] || 0; return <button key={char} type="button" disabled={count <= 0} onClick={() => onPick(char)} className="relative grid h-12 w-11 place-items-center rounded-xl border-2 bg-white text-xl font-black shadow-sm transition active:scale-95 disabled:bg-stone-100 disabled:text-stone-300 disabled:shadow-none">{char}{count > 0 && <span className="absolute -right-1 -top-1 rounded-full bg-emerald-700 px-1.5 text-[10px] font-bold text-white">{count}</span>}</button>; })}</div>)}</div><p className="mt-3 text-xs text-stone-500">有効な文字だけ選択できます。残り山: {total}枚</p></div></div>; }
+function CompletionCard({ status }) { return <div className={`shrink-0 rounded-3xl border p-3 text-sm ${status.complete ? "border-amber-300 bg-amber-50 text-amber-950" : "border-stone-200 bg-white"}`}><div className="flex flex-wrap items-center gap-2"><span className={`rounded-full px-3 py-1 text-xs font-bold ${status.complete ? "bg-amber-500 text-white" : "bg-stone-100"}`}>{status.complete ? "完成候補" : "未完成"}</span><b>{status.title}</b>{status.tentativeCount > 0 && <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-bold text-sky-800">仮固定 {status.tentativeCount}</span>}</div><div className="mt-2 grid grid-cols-3 gap-2 text-center text-xs"><div className="rounded-2xl bg-white/80 p-2"><b className="block text-base">{status.mentsuCount}</b>確定メンツ</div><div className="rounded-2xl bg-white/80 p-2"><b className="block text-base">{status.pairCount}</b>確定雀頭</div><div className="rounded-2xl bg-white/80 p-2"><b className="block text-base">{status.lockedTileCount}</b>確定牌</div></div><p className="mt-2 text-xs opacity-80">{status.detail}</p></div>; }
+function AssistPanel({ level, hand, fixedBlocks, selectedTiles, dictionary }) { const words = useMemo(() => getWordsFromTiles(hand, dictionary), [hand, dictionary]); const waits = useMemo(() => getWaits(hand, dictionary), [hand, dictionary]); const status = useMemo(() => getCompletionStatus(fixedBlocks), [fixedBlocks]); const recombinableTiles = useMemo(() => getRecombinableTiles(hand, fixedBlocks), [hand, fixedBlocks]); const lv3Plans = useMemo(() => getWordPlansFromTiles(recombinableTiles, dictionary), [recombinableTiles, dictionary]); const score = Math.min(100, status.mentsuCount * 22 + status.pairCount * 12 + words.length * 7 + waits.length * 3); if (level === 0) return <aside className="flex h-full min-h-0 flex-col overflow-hidden rounded-3xl bg-white p-4 shadow-sm"><h2 className="mb-2 flex items-center gap-2 font-black"><Sparkles size={18} />アシスト Lv0</h2><p className="text-sm text-stone-500">完全ノーアシストです。</p></aside>; const longWords = words.filter((entry) => entry.word.length >= 3); const pairWords = words.filter((entry) => entry.word.length === 2); return <aside className="flex h-full min-h-0 flex-col overflow-hidden rounded-3xl bg-white p-4 shadow-sm"><div className="mb-3 flex items-center justify-between gap-2"><h2 className="flex items-center gap-2 font-black"><Sparkles size={18} />アシスト Lv{level}</h2>{level >= 2 && <span className="rounded-full bg-stone-100 px-3 py-1 text-xs font-bold">形評価 {score}</span>}</div><div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1 sm:pr-2"><section><h3 className="mb-2 font-bold">待ち候補</h3>{waits.length ? <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">{waits.map((w, i) => <div key={`${w.word}-${i}`} className="rounded-2xl bg-emerald-50 p-2 text-sm text-emerald-900"><b>{w.word}</b> <span className="text-xs">待ち:{w.wait}</span></div>)}</div> : <p className="text-sm text-stone-400">待ち候補なし</p>}</section>{level >= 2 && <section><h3 className="mb-2 font-bold">3文字以上の候補</h3><div className="flex flex-wrap gap-2">{longWords.length ? longWords.slice(0, 24).map((entry) => <span key={entry.word} className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-900">{entry.word}</span>) : <p className="text-sm text-stone-400">3文字以上の成立候補なし</p>}</div></section>}{level >= 2 && <section><h3 className="mb-2 font-bold">雀頭候補</h3><div className="flex flex-wrap gap-2">{pairWords.length ? pairWords.slice(0, 12).map((entry) => <span key={entry.word} className="rounded-full border px-3 py-1 text-xs font-bold">{entry.word}</span>) : <p className="text-sm text-stone-400">2文字候補なし</p>}</div></section>}{level >= 3 && <section className="rounded-2xl bg-amber-50 p-3 text-sm text-amber-950"><h3 className="mb-2 font-bold">組み換えおすすめ</h3><p className="mb-2 text-xs text-amber-700">通常形では2文字は雀頭候補として1つまで、七対子型では2文字×複数を候補に残します。</p>{lv3Plans.length ? <div className="space-y-2">{lv3Plans.map((plan, index) => <div key={`${plan.words.join("-")}-${index}`} className="rounded-2xl bg-white/80 p-2"><div className="flex flex-wrap items-center gap-1.5"><span className="rounded-full bg-amber-500 px-2 py-0.5 text-[11px] font-black text-white">{plan.kind}</span>{plan.words.map((word) => <span key={word} className="rounded-full border border-amber-200 bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-950">{word}</span>)}</div><p className="mt-1 text-[11px] text-amber-700">使用 {plan.used}枚 / 残り {plan.remaining.length ? plan.remaining.join("・") : "なし"}</p></div>)}</div> : <p className="text-sm text-amber-700">組み換え候補なし</p>}</section>}</div></aside>; }
+function HomeScreen({ onStart, savedGame, onLoadSaved, onClearSaved, userWords, dictionaryLength, onAddUserWords }) { const [mode, setMode] = useState("random"); const [handSize, setHandSize] = useState(13); const [assistLevel, setAssistLevel] = useState(2); const [manualText, setManualText] = useState("さくらうみねこ"); const [wordText, setWordText] = useState(""); const [feedbackText, setFeedbackText] = useState(""); const [contactText, setContactText] = useState(""); const [modal, setModal] = useState(null); const parsedWords = useMemo(() => parseWords(wordText).filter((word) => word.length >= 3), [wordText]); const submitWords = () => { const added = onAddUserWords(parsedWords); if (added.length) { setWordText(""); setModal("words-added"); } else alert("追加できる未登録の3文字以上単語が見つかりませんでした。既存語彙と重複している可能性があります。"); }; const submitFeedback = () => { if (!feedbackText.trim()) { alert("要望を入力してください。"); return; } setFeedbackText(""); setContactText(""); setModal("feedback-saved"); }; return <div className="min-h-[100dvh] bg-gradient-to-br from-emerald-50 via-white to-stone-100 p-3 text-stone-900 sm:p-4"><div className="mx-auto flex min-h-[calc(100dvh-24px)] max-w-3xl flex-col justify-between gap-4 sm:min-h-[calc(100dvh-32px)]"><div className="space-y-4"><header className="rounded-[1.5rem] bg-emerald-700 p-6 text-center text-white shadow-lg sm:rounded-[2rem] sm:p-8"><div className="text-xs font-bold uppercase tracking-[0.3em] text-emerald-100 sm:text-sm">Solo Practice</div><h1 className="mt-3 text-4xl font-black leading-tight tracking-tight sm:text-5xl">Hiragana Mahjong</h1><p className="mt-1 text-2xl font-black text-emerald-50 sm:text-3xl">Solo Practice</p><div className="mx-auto mt-4 w-fit rounded-full bg-white/15 px-4 py-2 text-sm font-bold text-emerald-50">辞書数: {dictionaryLength}語 / 端末追加: {userWords.length}語</div></header>{savedGame && <section className="rounded-3xl border border-emerald-200 bg-emerald-50 p-4 text-center shadow-sm"><div className="font-bold text-emerald-900">保存中の練習があります</div><p className="mt-1 text-sm text-emerald-800">手牌 {savedGame.hand?.length || 0}枚 / 固定 {savedGame.fixedBlocks?.length || 0}ブロック / 捨て牌 {savedGame.discarded?.length || 0}枚</p><div className="mt-3 flex flex-wrap justify-center gap-2"><button type="button" onClick={onLoadSaved} className="rounded-2xl bg-emerald-700 px-8 py-3 text-lg font-black text-white shadow-sm">再開</button><button type="button" onClick={onClearSaved} className="rounded-2xl border bg-white px-4 py-2">削除</button></div></section>}<section className="rounded-3xl bg-white p-4 shadow-sm sm:p-5"><div className="border-b pb-3"><h2 className="text-lg font-black">開始設定</h2><p className="mt-1 text-sm text-stone-500">手牌の作り方とアシストレベルを選んでください。</p></div><div className="mt-4 space-y-5"><div><label className="mb-2 block text-sm font-bold">開始方法</label><div className="grid grid-cols-2 rounded-2xl bg-stone-100 p-1"><button type="button" onClick={() => setMode("random")} className={`rounded-xl px-4 py-3 font-bold ${mode === "random" ? "bg-emerald-700 text-white" : "text-stone-600"}`}>ランダム</button><button type="button" onClick={() => setMode("manual")} className={`rounded-xl px-4 py-3 font-bold ${mode === "manual" ? "bg-emerald-700 text-white" : "text-stone-600"}`}>手動入力</button></div>{mode === "manual" && <label className="mt-3 block text-sm font-bold">手牌文字<input value={manualText} onChange={(e) => setManualText(e.target.value)} className="mt-2 w-full rounded-2xl border border-stone-300 bg-white p-3 text-base outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100" placeholder="例：さくらうみねこ" /><span className="mt-1 block text-xs font-normal text-stone-500">ひらがな・カタカナを入力できます。記号や空白は除外されます。</span></label>}</div><div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><label className="rounded-2xl border border-stone-200 bg-stone-50 p-3 text-sm font-bold">手牌枚数<select value={handSize} onChange={(e) => setHandSize(Number(e.target.value))} className="mt-2 w-full rounded-xl border bg-white p-3 outline-none focus:border-emerald-600">{[7, 10, 13, 16, 20].map((n) => <option key={n} value={n}>{n}枚</option>)}</select></label><label className="rounded-2xl border border-stone-200 bg-stone-50 p-3 text-sm font-bold">アシスト<select value={assistLevel} onChange={(e) => setAssistLevel(Number(e.target.value))} className="mt-2 w-full rounded-xl border bg-white p-3 outline-none focus:border-emerald-600">{[0, 1, 2, 3].map((n) => <option key={n} value={n}>Lv{n}</option>)}</select></label></div><button type="button" onClick={() => onStart({ mode, handSize, assistLevel, manualText })} className="w-full rounded-3xl bg-emerald-700 px-8 py-4 text-xl font-black text-white shadow-lg active:scale-[0.99]">開始</button></div></section><section className="grid gap-2 sm:grid-cols-2"><button type="button" onClick={() => setModal("help")} className="rounded-2xl border bg-white px-4 py-3 font-bold shadow-sm"><HelpCircle className="mr-2 inline" size={16} />使い方</button><button type="button" onClick={() => setModal("feedback")} className="rounded-2xl border bg-white px-4 py-3 font-bold shadow-sm"><MessageSquareText className="mr-2 inline" size={16} />単語登録・要望</button></section></div><AdBox label="ホーム下部広告枠" /></div>{modal === "help" && <Modal title="ソロ練習の使い方" onClose={() => setModal(null)}><div className="space-y-2 text-sm text-stone-700"><p>手牌から文字を選び、「仮固定」で候補ブロックにします。</p><p>仮固定を「確定」するとブロックが完成扱いになります。4文字以上のブロックはカン扱いとなり、確定時に追加牌を補充します。</p><p>完成判定では、固定ブロックごとに未登録語彙をそのまま追加できます。</p><p>端末追加語彙は全体辞書とは別保存です。全体アップデートでは消さず、重複した語だけ追加対象から外します。</p></div></Modal>}{modal === "feedback" && <Modal title="単語登録・要望" onClose={() => setModal(null)}><div className="space-y-5"><section className="rounded-3xl border border-emerald-100 bg-emerald-50 p-3"><h3 className="font-black text-emerald-950">単語登録</h3><p className="mt-1 text-xs text-emerald-800">アシスト辞書に入れたい単語だけを入力します。3文字以上が登録対象です。</p><textarea value={wordText} onChange={(e) => setWordText(e.target.value)} className="mt-3 w-full rounded-2xl border border-emerald-200 bg-white p-3 outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100" rows={4} placeholder="例：かたつむり、しゃぼんだま / ゆきだるま" /><div className="mt-2 rounded-2xl bg-white/80 p-2 text-xs text-emerald-900"><b>検出中:</b> {parsedWords.length ? parsedWords.join("、") : "なし"}</div><button type="button" onClick={submitWords} className="mt-3 rounded-2xl bg-emerald-700 px-4 py-3 font-bold text-white"><PlusCircle className="mr-2 inline" size={16} />単語を追加</button></section><section className="rounded-3xl border border-stone-200 bg-stone-50 p-3"><h3 className="font-black">要望</h3><p className="mt-1 text-xs text-stone-500">機能要望・不具合メモはこちら。単語登録とは分けて扱います。</p><input value={contactText} onChange={(e) => setContactText(e.target.value)} className="mt-3 w-full rounded-2xl border border-stone-300 bg-white p-3 outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100" placeholder="返信先メール（任意）" /><textarea value={feedbackText} onChange={(e) => setFeedbackText(e.target.value)} className="mt-3 w-full rounded-2xl border border-stone-300 bg-white p-3 outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100" rows={4} placeholder="例：Lv3の表示順を変えたい / カン周りのUIを直したい" /><button type="button" onClick={submitFeedback} className="mt-3 rounded-2xl border bg-white px-4 py-3 font-bold">要望を控える</button></section></div></Modal>}{modal === "words-added" && <Modal title="単語を追加しました" onClose={() => setModal(null)}><p className="text-sm text-stone-700">追加した単語はこの端末に保存され、待ち候補・メンツ候補に反映されます。</p></Modal>}{modal === "feedback-saved" && <Modal title="要望を控えました" onClose={() => setModal(null)}><p className="text-sm text-stone-700">今は端末内の入力処理のみです。送信先を接続すると、このフォームをそのまま送信用にできます。</p></Modal>}</div>; }
+function SoloPlayScreen({ settings, onBack, dictionary, onAddUserWords }) { const initialGame = useMemo(() => settings.savedState || createGame(settings), [settings]); const [hand, setHand] = useState(initialGame.hand || []); const [wall, setWall] = useState(initialGame.wall || []); const [fixedBlocks, setFixedBlocks] = useState(initialGame.fixedBlocks || []); const [discarded, setDiscarded] = useState(initialGame.discarded || []); const [hasDrawnThisTurn, setHasDrawnThisTurn] = useState(initialGame.hasDrawnThisTurn || false); const [selectedIds, setSelectedIds] = useState([]); const [assistLevel, setAssistLevel] = useState(settings.savedState?.assistLevel ?? settings.assistLevel); const [exitOpen, setExitOpen] = useState(false); const [drawPicker, setDrawPicker] = useState(null); const [completionOpen, setCompletionOpen] = useState(false); const selectedTiles = hand.filter((tile) => selectedIds.includes(tile.id)); const completionStatus = useMemo(() => getCompletionStatus(fixedBlocks), [fixedBlocks]); const dictionarySet = useMemo(() => new Set(dictionary.map((entry) => entry.word)), [dictionary]); const blockWordCandidates = useMemo(() => fixedBlocks.map((block, index) => { const word = blockToWord(block); const addable = word.length >= 3 && !dictionarySet.has(word); return { id: block.id, index, word, addable, confirmed: isConfirmedBlock(block), length: word.length }; }), [fixedBlocks, dictionarySet]); const drawCounts = useMemo(() => wall.reduce((acc, tile) => { acc[tile.char] = (acc[tile.char] || 0) + 1; return acc; }, {}), [wall]); const openNormalDrawPicker = () => { if (hasDrawnThisTurn || wall.length === 0) return; setDrawPicker({ type: "normal" }); }; const addTileFromWall = (char, mode = "normal") => { const index = wall.findIndex((tile) => tile.char === char); if (index < 0) return; const tile = wall[index]; setHand((prev) => [...prev, tile]); setWall((prev) => prev.filter((_, i) => i !== index)); if (mode === "normal") { setHasDrawnThisTurn(true); setDrawPicker(null); return; } setDrawPicker((prev) => { if (!prev || prev.type !== "kan") return null; const remaining = prev.remaining - 1; return remaining > 0 ? { ...prev, remaining } : null; }); }; const discardSelected = () => { if (!hasDrawnThisTurn || selectedTiles.length !== 1) return; setDiscarded((prev) => [...prev, ...selectedTiles]); setHand((prev) => prev.filter((tile) => !selectedIds.includes(tile.id))); setSelectedIds([]); setHasDrawnThisTurn(false); }; const fixSelected = () => { if (!selectedTiles.length) return; setFixedBlocks((prev) => [...prev, { id: `block-${Date.now()}`, tiles: selectedTiles, confirmed: false }]); setHand((prev) => prev.filter((tile) => !selectedIds.includes(tile.id))); setSelectedIds([]); }; const confirmFixedBlock = (blockId) => { const target = fixedBlocks.find((block) => block.id === blockId); if (!target || isConfirmedBlock(target)) return; const drawCount = Math.min(getKanDrawCount(target), wall.length); setFixedBlocks((prev) => prev.map((block) => block.id === blockId ? { ...block, confirmed: true, kanDrawCount: drawCount } : block)); if (drawCount > 0) setDrawPicker({ type: "kan", blockId, remaining: drawCount, total: drawCount }); }; const returnFixedBlock = (blockId) => { setFixedBlocks((prev) => { const target = prev.find((block) => block.id === blockId); if (!target) return prev; setHand((h) => [...h, ...target.tiles]); return prev.filter((block) => block.id !== blockId); }); }; const undoLastBlock = () => { if (fixedBlocks.length) returnFixedBlock(fixedBlocks[fixedBlocks.length - 1].id); }; const reset = () => { const next = createGame({ mode: "random", handSize: settings.handSize || 13 }); setHand(next.hand); setWall(next.wall); setFixedBlocks([]); setDiscarded([]); setSelectedIds([]); setHasDrawnThisTurn(false); setDrawPicker(null); }; const addBlockWord = (word) => { const added = onAddUserWords([word]); if (added.length) alert(`${word} を追加しました。`); else alert("既に登録済み、または追加対象外です。"); }; const makeSaveData = () => ({ hand, wall, fixedBlocks, discarded, hasDrawnThisTurn, assistLevel, savedAt: Date.now(), settings: { ...settings, savedState: undefined } }); return <div className="min-h-[100dvh] bg-stone-100 p-2 text-stone-900 sm:p-3 lg:h-screen lg:overflow-hidden"><div className="mx-auto grid min-h-[calc(100dvh-16px)] max-w-7xl gap-3 lg:h-full lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_360px]"><main className="flex min-h-0 flex-col gap-3 lg:overflow-hidden"><header className="flex shrink-0 flex-wrap items-center gap-2 rounded-3xl bg-emerald-700 p-3 text-white shadow-sm"><button type="button" onClick={() => setExitOpen(true)} className="rounded-2xl bg-white px-3 py-2 font-bold text-emerald-800"><Home className="mr-1 inline" size={16} />ホーム</button><strong>ソロ練習</strong><span className="ml-auto rounded-full bg-white px-3 py-1 text-xs font-bold text-emerald-800">山 {wall.length}</span><select value={assistLevel} onChange={(e) => setAssistLevel(Number(e.target.value))} className="rounded-2xl bg-white p-2 text-stone-900">{[0, 1, 2, 3].map((n) => <option key={n} value={n}>Lv{n}</option>)}</select></header><section className="shrink-0 rounded-3xl bg-white p-3 shadow-sm sm:p-4"><h2 className="mb-2 font-bold">手牌</h2><div className="flex max-h-44 min-h-20 flex-wrap gap-2 overflow-y-auto rounded-3xl bg-emerald-900/5 p-2 pr-2 sm:max-h-32 sm:p-3">{hand.map((tile) => <Tile key={tile.id} tile={tile} selected={selectedIds.includes(tile.id)} onClick={() => setSelectedIds((prev) => prev.includes(tile.id) ? prev.filter((x) => x !== tile.id) : [...prev, tile.id])} />)}</div></section><div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-2 lg:overflow-hidden"><section className="flex min-h-0 flex-col overflow-hidden rounded-3xl bg-white p-3 shadow-sm sm:p-4"><h2 className="mb-2 shrink-0 font-bold">固定ブロック</h2><div className="max-h-64 min-h-32 flex-1 space-y-2 overflow-y-auto pr-1 lg:max-h-none lg:min-h-0 lg:pr-2">{fixedBlocks.length ? fixedBlocks.map((block, i) => { const drawCount = getKanDrawCount(block); const confirmed = isConfirmedBlock(block); const isKanBlock = isConfirmedBlock(block) && (block.kanDrawCount ?? 0) > 0; return <div key={block.id} className={`flex items-center gap-2 overflow-x-auto rounded-2xl p-2 ${confirmed ? "bg-stone-50" : "bg-sky-50 ring-2 ring-sky-100"}`}><span className={`shrink-0 rounded-full px-2 py-1 text-xs font-bold ${confirmed ? "bg-stone-200" : "bg-sky-600 text-white"}`}>{confirmed ? i + 1 : "仮"}</span><div className="flex gap-1">{block.tiles.map((tile) => <Tile key={tile.id} tile={tile} disabled />)}</div>{!confirmed && <button type="button" onClick={() => confirmFixedBlock(block.id)} className="ml-auto shrink-0 rounded-xl bg-emerald-700 px-3 py-2 text-sm font-bold text-white">確定{drawCount > 0 ? ` カン +${drawCount}` : ""}</button>}{confirmed && block.kanDrawCount > 0 && <span className="ml-auto shrink-0 rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">カン +{block.kanDrawCount}</span>}{!isKanBlock && <button type="button" onClick={() => returnFixedBlock(block.id)} className={`${confirmed ? "ml-auto" : ""} shrink-0 rounded-xl border bg-white px-3 py-2 text-sm`}>戻す</button>}</div>; }) : <p className="text-sm text-stone-400">まだ固定なし</p>}</div></section><section className="flex min-h-0 flex-col overflow-hidden rounded-3xl bg-white p-3 shadow-sm sm:p-4"><h2 className="mb-2 shrink-0 font-bold">捨て牌</h2><div className="grid max-h-48 min-h-32 flex-1 grid-cols-5 content-start gap-2 overflow-y-auto rounded-2xl bg-stone-50 p-2 pr-1 sm:grid-cols-6 sm:p-3 lg:max-h-none lg:min-h-0 lg:pr-2">{discarded.map((tile) => <Tile key={tile.id} tile={tile} disabled />)}</div></section></div><CompletionCard status={completionStatus} /><div className="grid shrink-0 grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-6"><button type="button" disabled={hasDrawnThisTurn || wall.length === 0} onClick={openNormalDrawPicker} className="rounded-2xl bg-emerald-700 px-3 py-3 font-bold text-white disabled:opacity-40 sm:py-2">文字を追加</button><button type="button" disabled={!selectedTiles.length} onClick={fixSelected} className="rounded-2xl border bg-white px-3 py-3 font-bold disabled:opacity-40 sm:py-2">仮固定</button><button type="button" disabled={!fixedBlocks.length} onClick={undoLastBlock} className="rounded-2xl border bg-white px-3 py-3 font-bold disabled:opacity-40 sm:py-2"><Undo2 className="mr-1 inline" size={16} />最後を戻す</button><button type="button" disabled={!hasDrawnThisTurn || selectedTiles.length !== 1} onClick={discardSelected} className="rounded-2xl bg-red-600 px-3 py-3 font-bold text-white disabled:opacity-40 sm:py-2"><Trash2 className="mr-1 inline" size={16} />捨てる</button><button type="button" onClick={() => setCompletionOpen(true)} className={`rounded-2xl px-3 py-3 font-bold sm:py-2 ${completionStatus.complete ? "bg-amber-500 text-white" : "bg-white border"}`}>完成判定</button><button type="button" onClick={reset} className="rounded-2xl border bg-white px-3 py-3 font-bold sm:py-2"><RotateCcw className="mr-1 inline" size={16} />リセット</button></div><AdBox label="プレイ画面下部広告枠" /></main><div className="min-h-[360px] overflow-hidden lg:min-h-0"><AssistPanel level={assistLevel} hand={hand} fixedBlocks={fixedBlocks} selectedTiles={selectedTiles} dictionary={dictionary} /></div></div>{drawPicker?.type === "normal" && <TilePickerModal title="追加する文字を選択" note="山に残っている文字だけ選べます。" counts={drawCounts} onPick={(char) => addTileFromWall(char, "normal")} onClose={() => setDrawPicker(null)} />}{drawPicker?.type === "kan" && <TilePickerModal title="カン追加牌を選択" note={`あと${drawPicker.remaining}枚選択してください。`} counts={drawCounts} onPick={(char) => addTileFromWall(char, "kan")} />}{completionOpen && <Modal title="完成判定" onClose={() => setCompletionOpen(false)}><div className="space-y-4"><CompletionCard status={completionStatus} /><section className="rounded-3xl border border-emerald-100 bg-emerald-50 p-3"><h3 className="font-black text-emerald-950">固定ブロックから語彙追加</h3><p className="mt-1 text-xs text-emerald-800">入力し直さず、固定ブロックごとに未登録語彙を追加できます。3文字以上で、既存辞書にないものだけ追加できます。</p><div className="mt-3 space-y-2">{blockWordCandidates.length ? blockWordCandidates.map((item) => <div key={item.id} className="flex items-center gap-2 rounded-2xl bg-white/85 p-2"><span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-bold text-emerald-900">{item.confirmed ? `${item.index + 1}` : "仮"}</span><b className="text-lg">{item.word || "-"}</b><span className="text-xs text-stone-500">{item.length}文字</span>{item.addable ? <button type="button" onClick={() => addBlockWord(item.word)} className="ml-auto rounded-xl bg-emerald-700 px-3 py-2 text-xs font-bold text-white">追加</button> : <span className="ml-auto rounded-xl bg-stone-100 px-3 py-2 text-xs font-bold text-stone-500">{item.length < 3 ? "対象外" : "登録済み"}</span>}</div>) : <p className="text-sm text-emerald-800">固定ブロックがありません。</p>}</div></section></div></Modal>}{exitOpen && <Modal title="練習を終了しますか？" onClose={() => setExitOpen(false)}><p className="mb-4 text-sm text-stone-600">現在の手牌・固定ブロック・捨て牌を保存してホームに戻れます。</p><div className="flex flex-wrap gap-2"><button type="button" onClick={() => onBack(makeSaveData())} className="rounded-2xl bg-emerald-700 px-4 py-2 font-bold text-white"><Save className="mr-2 inline" size={16} />保存して終了</button><button type="button" onClick={() => onBack(null)} className="rounded-2xl bg-red-600 px-4 py-2 font-bold text-white">保存せず終了</button></div></Modal>}</div>; }
+export default function App() { const [screen, setScreen] = useState("home"); const [settings, setSettings] = useState(null); const [savedGame, setSavedGame] = useState(() => { try { const raw = typeof window !== "undefined" ? window.localStorage.getItem(SAVE_KEY) : null; return raw ? JSON.parse(raw) : null; } catch { return null; } }); const [userWords, setUserWords] = useState(() => { try { const raw = typeof window !== "undefined" ? window.localStorage.getItem(USER_WORDS_KEY) : null; return raw ? normalizeUserWords(JSON.parse(raw)) : []; } catch { return []; } }); const dictionary = useMemo(() => makeDictionary(userWords), [userWords]); const addUserWords = (words) => { const cleaned = normalizeUserWords(parseWords(words.join(" ")).filter((word) => word.length >= 3)); const existing = new Set(userWords.map(cleanText)); const added = cleaned.filter((word) => !existing.has(word)); if (!added.length) return []; const next = normalizeUserWords([...userWords, ...added]); setUserWords(next); if (typeof window !== "undefined") window.localStorage.setItem(USER_WORDS_KEY, JSON.stringify(next)); return added; }; const start = (nextSettings) => { setSettings(nextSettings); setScreen("play"); }; const backToHome = (saveData) => { if (saveData) { setSavedGame(saveData); if (typeof window !== "undefined") window.localStorage.setItem(SAVE_KEY, JSON.stringify(saveData)); } setScreen("home"); }; const loadSaved = () => { if (!savedGame) return; setSettings({ ...(savedGame.settings || {}), savedState: savedGame }); setScreen("play"); }; const clearSaved = () => { setSavedGame(null); if (typeof window !== "undefined") window.localStorage.removeItem(SAVE_KEY); }; if (screen === "play" && settings) return <SoloPlayScreen settings={settings} onBack={backToHome} dictionary={dictionary} onAddUserWords={addUserWords} />; return <HomeScreen onStart={start} savedGame={savedGame} onLoadSaved={loadSaved} onClearSaved={clearSaved} userWords={userWords} dictionaryLength={dictionary.length} onAddUserWords={addUserWords} />; }
