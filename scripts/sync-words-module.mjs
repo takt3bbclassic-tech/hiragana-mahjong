@@ -9,10 +9,13 @@ let source = fs.readFileSync(legacyAppPath, "utf8");
 
 const wordsImport = 'import { BASE_WORDS, BASE_WORD_COUNT } from "./words.js";';
 if (!source.includes(wordsImport)) {
-  source = source.replace(
-    'import React, { useMemo, useState } from "react";\n',
-    `import React, { useMemo, useState } from "react";\n${wordsImport}\n`
-  );
+  const reactImport = 'import React, { useMemo, useState } from "react";';
+  const reactIndex = source.indexOf(reactImport);
+  if (reactIndex < 0) {
+    throw new Error("React import line was not found in src/App.jsx");
+  }
+  const insertAt = reactIndex + reactImport.length;
+  source = `${source.slice(0, insertAt)}\n${wordsImport}${source.slice(insertAt)}`;
 }
 
 const textStart = source.indexOf('\nconst BASE_WORDS_TEXT = "');
@@ -30,6 +33,13 @@ if (!source.includes("const PRACTICE_BASE_WORD_COUNT = BASE_WORD_COUNT;")) {
 }
 
 source = source.split("辞書数: {dictionaryLength}語").join("辞書数: {PRACTICE_BASE_WORD_COUNT}語");
+
+if (!source.includes(wordsImport)) {
+  throw new Error("Generated App is missing words import");
+}
+if (source.includes("const BASE_WORDS_TEXT =")) {
+  throw new Error("Generated App still contains inline BASE_WORDS_TEXT");
+}
 
 if (CHECK_ONLY) {
   const current = fs.existsSync(generatedAppPath) ? fs.readFileSync(generatedAppPath, "utf8") : "";
