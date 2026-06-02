@@ -48,6 +48,12 @@ replaceRequired(
 );
 
 replaceRequired(
+  " const selectedTiles = hand.filter((tile) => selectedIds.includes(tile.id));",
+  " const selectedTiles = selectedIds.map((id) => hand.find((tile) => tile.id === id)).filter(Boolean);",
+  "selected tiles click order"
+);
+
+replaceRequired(
   " const drawCounts = useMemo(() => wall.reduce((acc, tile) => { acc[tile.char] = (acc[tile.char] || 0) + 1; return acc; }, {}), [wall]); const openNormalDrawPicker = () => { if (hasDrawnThisTurn || wall.length === 0) return; setDrawPicker({ type: \"normal\" }); }; const addTileFromWall = (char, mode = \"normal\") => { const index = wall.findIndex((tile) => tile.char === char); if (index < 0) return; const tile = wall[index]; setHand((prev) => [...prev, tile]); setWall((prev) => prev.filter((_, i) => i !== index)); if (mode === \"normal\") { setHasDrawnThisTurn(true); setDrawPicker(null); return; } setDrawPicker((prev) => { if (!prev || prev.type !== \"kan\") return null; const remaining = prev.remaining - 1; return remaining > 0 ? { ...prev, remaining } : null; }); };",
   " const drawFromWall = (count = 1, markTurnDrawn = false) => { if (wall.length === 0 || count <= 0) return; const drawCount = Math.min(count, wall.length); const drawn = wall.slice(0, drawCount); setHand((prev) => [...prev, ...drawn]); setWall((prev) => prev.slice(drawCount)); if (markTurnDrawn) setHasDrawnThisTurn(true); }; const drawOneTile = () => { if (hasDrawnThisTurn || wall.length === 0) return; drawFromWall(1, true); };",
   "draw picker handlers"
@@ -61,7 +67,7 @@ replaceRequired(
 
 source = source.split(" setDrawPicker(null);").join("");
 source = source.split("onClick={openNormalDrawPicker}").join("onClick={drawOneTile}");
-source = source.split(">文字を追加</button>").join(">ツモ</button>");
+source = source.split(">文字を追加</button>").join(">一枚引く</button>");
 
 replaceRequired(
   "{drawPicker?.type === \"normal\" && <TilePickerModal title=\"追加する文字を選択\" note=\"山に残っている文字だけ選べます。\" counts={drawCounts} onPick={(char) => addTileFromWall(char, \"normal\")} onClose={() => setDrawPicker(null)} />}{drawPicker?.type === \"kan\" && <TilePickerModal title=\"カン追加牌を選択\" note={`あと${drawPicker.remaining}枚選択してください。`} counts={drawCounts} onPick={(char) => addTileFromWall(char, \"kan\")} />}",
@@ -77,6 +83,12 @@ if (source.includes("const BASE_WORDS_TEXT =")) {
 }
 if (source.includes("drawPicker") || source.includes("TilePickerModal title=\"追加する文字を選択\"")) {
   throw new Error("Generated App still contains draw picker behavior");
+}
+if (source.includes(">ツモ</button>") || !source.includes(">一枚引く</button>")) {
+  throw new Error("Generated App has wrong draw button label");
+}
+if (!source.includes("const selectedTiles = selectedIds.map((id) => hand.find((tile) => tile.id === id)).filter(Boolean);")) {
+  throw new Error("Generated App does not preserve selected tile click order");
 }
 
 if (CHECK_ONLY) {
