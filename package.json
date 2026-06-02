@@ -4,9 +4,11 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "predev": "node scripts/sync-words-module.mjs",
+    "generate": "node scripts/sync-words-module.mjs",
+    "check:generated": "node scripts/sync-words-module.mjs --check",
+    "predev": "npm run generate",
     "dev": "vite --host 0.0.0.0",
-    "prebuild": "node scripts/sync-words-module.mjs",
+    "prebuild": "npm run generate",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0"
   },
