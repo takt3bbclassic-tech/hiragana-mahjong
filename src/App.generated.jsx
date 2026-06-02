@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { BASE_WORDS, BASE_WORD_COUNT } from "./words.js";
 import { Home, RotateCcw, Save, Sparkles, Trash2, Undo2, HelpCircle, MessageSquareText, PlusCircle } from "lucide-react";
 
 const BASIC_TILES = "あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわん".split("");
