@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
+const CHECK_ONLY = process.argv.includes("--check");
 const srcDir = path.join(process.cwd(), "src");
 const legacyAppPath = path.join(srcDir, "App.jsx");
 const generatedAppPath = path.join(srcDir, "App.generated.jsx");
@@ -30,5 +31,14 @@ if (!source.includes("const PRACTICE_BASE_WORD_COUNT = BASE_WORD_COUNT;")) {
 
 source = source.split("辞書数: {dictionaryLength}語").join("辞書数: {PRACTICE_BASE_WORD_COUNT}語");
 
-fs.writeFileSync(generatedAppPath, source);
-console.log("generated src/App.generated.jsx from src/App.jsx and src/words.js");
+if (CHECK_ONLY) {
+  const current = fs.existsSync(generatedAppPath) ? fs.readFileSync(generatedAppPath, "utf8") : "";
+  if (current !== source) {
+    console.error("src/App.generated.jsx is out of date. Run: npm run generate");
+    process.exit(1);
+  }
+  console.log("src/App.generated.jsx is up to date");
+} else {
+  fs.writeFileSync(generatedAppPath, source);
+  console.log("generated src/App.generated.jsx from src/App.jsx and src/words.js");
+}
